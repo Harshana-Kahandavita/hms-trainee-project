@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   Switch,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { useNavigation } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { LogoutHeader } from '@/components/logout-header';
 
 type MenuItemProps = {
   icon: string;
@@ -40,8 +42,15 @@ function MenuItem({ icon, title, subtitle, onPress, showArrow = true, rightEleme
 }
 
 export default function Profile() {
+  const navigation = useNavigation();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <LogoutHeader />,
+    });
+  }, [navigation]);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>

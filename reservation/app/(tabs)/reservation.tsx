@@ -1,19 +1,21 @@
-import {
-  StyleSheet,
-  Platform,
-  ScrollView,
-  SafeAreaView,
-  FlatList,
-  View,
-  Text,
-  TouchableOpacity,
-} from "react-native";
-import { useState } from "react";
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { RESERVATION_DATA } from "@/constants/reservationData";
 import ReservationDetailModal from "@/app/reservation/ReservationDetailModal";
+import { LogoutHeader } from "@/components/logout-header";
+import { RESERVATION_DATA } from "@/constants/reservationData";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useNavigation } from "@react-navigation/native";
+import { useLayoutEffect, useState } from "react";
+import {
+  FlatList,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 
 function formatReservationDate(dateString: string): string {
@@ -59,8 +61,15 @@ export default function ReservationsScreen() {
   const colors = Colors[colorScheme ?? "light"];
   const styles = createStyles(colors);
   const Container = Platform.OS === "web" ? ScrollView : SafeAreaView;
+  const navigation = useNavigation();
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <LogoutHeader />,
+    });
+  }, [navigation]);
 
   const handleItemPress = (item: any) => {
     setSelectedReservation(item);
