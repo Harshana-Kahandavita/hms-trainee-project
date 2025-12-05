@@ -1,9 +1,9 @@
-import React from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { router } from 'expo-router';
+import React from 'react';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 export function LogoutHeader() {
   const { setAuthenticated } = useAuth();
@@ -46,6 +46,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+
+
+
+
+
+
+
 
 
 

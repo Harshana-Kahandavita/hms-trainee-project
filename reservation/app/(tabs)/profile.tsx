@@ -1,16 +1,16 @@
-import { useState, useLayoutEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Switch,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { LogoutHeader } from '@/components/logout-header';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useNavigation } from '@react-navigation/native';
+import { Image } from 'expo-image';
+import { useLayoutEffect, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
 type MenuItemProps = {
   icon: string;

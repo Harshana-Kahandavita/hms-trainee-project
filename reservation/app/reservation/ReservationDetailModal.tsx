@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  StyleSheet,
   Modal,
-  View,
+  StyleSheet,
   Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
 
 // Define what data a reservation has

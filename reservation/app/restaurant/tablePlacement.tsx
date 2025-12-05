@@ -1,18 +1,18 @@
-import {
-  StyleSheet,
-  Platform,
-  ScrollView,
-  SafeAreaView,
-  View,
-  Text,
-  TouchableOpacity,
-} from "react-native";
-import { useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Calendar } from "react-native-calendars";
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Calendar } from "react-native-calendars";
 
 export default function TablePlacementScreen() {
   const colorScheme = useColorScheme();
