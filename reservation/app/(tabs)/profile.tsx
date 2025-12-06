@@ -1,14 +1,16 @@
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Switch,
-} from 'react-native';
-import { Image } from 'expo-image';
+import { LogoutHeader } from '@/components/logout-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useNavigation } from '@react-navigation/native';
+import { Image } from 'expo-image';
+import { useLayoutEffect, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
 type MenuItemProps = {
   icon: string;
@@ -40,8 +42,15 @@ function MenuItem({ icon, title, subtitle, onPress, showArrow = true, rightEleme
 }
 
 export default function Profile() {
+  const navigation = useNavigation();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <LogoutHeader />,
+    });
+  }, [navigation]);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
