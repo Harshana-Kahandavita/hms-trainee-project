@@ -1,0 +1,1617 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  output   = "./generated/prisma"
+
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id                 Int          @id @default(autoincrement()) @map("business_id")
+  name               String
+  address            String
+  phone              String
+  email              String
+  website            String?
+  taxId              String       @map("tax_id")
+  registrationNumber String       @map("registration_number")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  restaurants        Restaurant[]
+
+  @@map("business")
+}
+
+model Restaurant {
+  id                  Int                        @id @default(autoincrement()) @map("restaurant_id")
+  businessId          Int                        @map("business_id")
+  name                String
+  locationId          Int                        @map("location_id")
+  address             String
+  phone               String
+  description         String?
+  capacity            Int
+  onlineQuota         Int                        @map("online_quota")
+  thumbnailImageId    Int?                       @unique @map("thumbnail_image_id")
+  heroImageId         Int?                       @unique @map("hero_image_id")
+  metadata            Json?                      @map("metadata")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+  reservationSupport  ReservationSupportType     @default(BUFFET_ONLY) @map("reservation_support")
+  business            Business                   @relation(fields: [businessId], references: [id])
+  location            Location                   @relation(fields: [locationId], references: [id])
+  thumbnailImage      RestaurantImage?           @relation("ThumbnailImage", fields: [thumbnailImageId], references: [id])
+  heroImage           RestaurantImage?           @relation("HeroImage", fields: [heroImageId], references: [id])
+  images              RestaurantImage[]          @relation("RestaurantImages")
+  cuisines            RestaurantCuisine[]
+  operatingHours      RestaurantOperatingHours[]
+  mealServices        RestaurantMealService[]
+  platters            RestaurantPlatter[]
+  capacityRecords     RestaurantCapacity[]
+  specialClosures     RestaurantSpecialClosure[]
+  reservations        Reservation[]
+  reservationRequests ReservationRequest[]
+  serviceAreas        RestaurantServiceArea[]
+  advancePaymentPercentage Int                      @default(35) @map("advance_payment_percentage")
+  notifications       Notification[]
+  cleanupLogs         CleanupLog[]
+  promoCodeMappings   PromoCodeRestaurantMapping[]
+  refundPolicies      RestaurantRefundPolicy[]
+  cancellationRequests CancellationRequest[]
+  refundTransactions  RefundTransaction[]
+  modificationRequests ReservationModificationRequest[]
+  tableModificationRequests TableReservationModificationRequest[]
+  reviewStats         RestaurantReviewStats?
+  sections            RestaurantSection[]
+  tables              RestaurantTable[]
+  tableSlots          TableAvailabilitySlot[]
+  tableReservationConfigs TableReservationUtilsConfiguration[]
+  policies            ReservationBusinessPolicy[]
+
+  @@map("restaurants")
+}
+
+model Location {
+  id          Int          @id @default(autoincrement()) @map("location_id")
+  city        String
+  state       String
+  postalCode  String       @map("postal_code")
+  restaurants Restaurant[]
+
+  @@map("locations")
+}
+
+model Cuisine {
+  id          Int                 @id @default(autoincrement()) @map("cuisine_id")
+  cuisineName String              @map("cuisine_name")
+  restaurants RestaurantCuisine[]
+
+  @@map("cuisines")
+}
+
+model RestaurantCuisine {
+  restaurantId Int        @map("restaurant_id")
+  cuisineId    Int        @map("cuisine_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  cuisine      Cuisine    @relation(fields: [cuisineId], references: [id])
+
+  @@id([restaurantId, cuisineId])
+  @@map("restaurant_cuisines")
+}
+
+model RestaurantOperatingHours {
+  restaurantId Int        @map("restaurant_id")
+  dayOfWeek    DayOfWeek  @map("day_of_week")
+  isOpen       Boolean    @default(true) @map("is_open")
+  capacity     Int
+  onlineQuota  Int        @map("online_quota")
+  openingTime  DateTime   @map("opening_time") @db.Time()
+  closingTime  DateTime   @map("closing_time") @db.Time()
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@id([restaurantId, dayOfWeek])
+  @@map("restaurant_operating_hours")
+}
+
+model RestaurantMealService {
+  id                      Int                  @id @default(autoincrement()) @map("service_id")
+  restaurantId            Int                  @map("restaurant_id")
+  mealType                MealType             @map("meal_type")
+  isAvailable             Boolean              @default(true) @map("is_available")
+  isChildEnabled          Boolean              @default(false) @map("is_child_enabled")
+  adultGrossPrice         Decimal              @map("adult_gross_price") @db.Decimal(10, 2)
+  childGrossPrice         Decimal              @map("child_gross_price") @db.Decimal(10, 2)
+  adultNetPrice           Decimal              @map("adult_net_price") @db.Decimal(10, 2)
+  childNetPrice           Decimal              @map("child_net_price") @db.Decimal(10, 2)
+  childAgeLimit           Int                  @map("child_age_limit")
+  serviceChargePercentage Decimal              @default(0.00) @map("service_charge_percentage") @db.Decimal(5, 2)
+  taxPercentage           Decimal              @default(0.00) @map("tax_percentage") @db.Decimal(5, 2)
+  priceUpdatedAt          DateTime             @map("price_updated_at")
+  serviceStartTime        DateTime             @map("service_start_time") @db.Time()
+  serviceEndTime          DateTime             @map("service_end_time") @db.Time()
+  restaurant              Restaurant           @relation(fields: [restaurantId], references: [id])
+  RestaurantCapacity      RestaurantCapacity[]
+  schedule                RestaurantMealServiceSchedule?
+  platters                RestaurantPlatter[]
+  reservationRequests     ReservationRequest[]
+  isLegacyPricing         Boolean              @default(true) @map("is_legacy_pricing")
+
+  @@unique([restaurantId, mealType, serviceStartTime, serviceEndTime])
+  @@map("restaurant_meal_services")
+}
+
+model RestaurantMealServiceSchedule {
+  id             Int                  @id @default(autoincrement()) @map("schedule_id")
+  mealServiceId  Int                  @unique @map("meal_service_id")
+  availableDays  DayOfWeek[]          @default([MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]) @map("available_days")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  mealService    RestaurantMealService @relation(fields: [mealServiceId], references: [id])
+
+  @@map("restaurant_meal_service_schedules")
+}
+
+model RestaurantCapacity {
+  id           Int                   @id @default(autoincrement()) @map("capacity_id")
+  restaurantId Int                   @map("restaurant_id")
+  serviceId    Int                   @map("service_id")
+  date         DateTime              @db.Date
+  totalSeats   Int                   @default(0) @map("total_seats")
+  bookedSeats  Int                   @default(0) @map("booked_seats")
+  isEnabled    Boolean               @default(true) @map("is_enabled")
+  restaurant   Restaurant            @relation(fields: [restaurantId], references: [id])
+  mealService  RestaurantMealService @relation(fields: [serviceId], references: [id])
+
+  @@unique([restaurantId, serviceId, date])
+  @@map("restaurant_capacity")
+}
+
+model RestaurantImage {
+  id             Int         @id @default(autoincrement()) @map("image_id")
+  restaurantId   Int         @map("restaurant_id")
+  imageUrl       String      @map("image_url")
+  imageType      String      @map("image_type")
+  altText        String      @map("alt_text")
+  caption        String?
+  displayOrder   Int         @map("display_order")
+  isActive       Boolean     @default(true) @map("is_active")
+  uploadedAt     DateTime    @default(now()) @map("uploaded_at")
+  uploadedBy     String      @map("uploaded_by")
+  lastModifiedAt DateTime    @updatedAt @map("last_modified_at")
+  lastModifiedBy String      @map("last_modified_by")
+  restaurant     Restaurant  @relation("RestaurantImages", fields: [restaurantId], references: [id])
+  thumbnailFor   Restaurant? @relation("ThumbnailImage")
+  heroFor        Restaurant? @relation("HeroImage")
+
+  @@map("restaurant_images")
+}
+
+model RestaurantReviewStats {
+  id                 Int       @id @default(autoincrement()) @map("stats_id")
+  restaurantId       Int       @unique @map("restaurant_id")
+  totalReviews       Int       @default(0) @map("total_reviews")
+  avgServiceRating   Decimal   @default(0) @map("avg_service_rating") @db.Decimal(3, 2)
+  avgMealRating      Decimal   @default(0) @map("avg_meal_rating") @db.Decimal(3, 2)
+  avgPlatformRating  Decimal   @default(0) @map("avg_platform_rating") @db.Decimal(3, 2)
+  serviceRating1Count Int      @default(0) @map("service_rating_1_count")
+  serviceRating2Count Int      @default(0) @map("service_rating_2_count")
+  serviceRating3Count Int      @default(0) @map("service_rating_3_count")
+  serviceRating4Count Int      @default(0) @map("service_rating_4_count")
+  serviceRating5Count Int      @default(0) @map("service_rating_5_count")
+  lastUpdated        DateTime  @default(now()) @updatedAt @map("last_updated")
+  restaurant         Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("restaurant_review_stats")
+}
+
+model Customer {
+  id                  Int                  @id @default(autoincrement()) @map("customer_id")
+  firstName           String               @map("first_name")
+  lastName            String               @map("last_name")
+  email               String?              @unique
+  phone               String               @unique
+  createdAt           DateTime             @default(now()) @map("created_at")
+  reservations        Reservation[]
+  reservationRequests ReservationRequest[]
+  reviews             ReservationReview[]
+  promoCodeUsages     PromoCodeUsage[]
+  promoCodeMappings   PromoCodeCustomerMapping[]
+
+  @@map("customers")
+}
+
+model Reservation {
+  id                  Int                  @id @default(autoincrement()) @map("reservation_id")
+  reservationNumber   String               @unique @map("reservation_number")
+  restaurantId        Int                  @map("restaurant_id")
+  customerId          Int                  @map("customer_id")
+  requestId           Int                  @unique @map("request_id")
+  reservationName     String               @map("reservation_name")
+  contactPhone        String               @map("contact_phone")
+  reservationDate     DateTime             @map("reservation_date") @db.Date
+  reservationTime     DateTime             @map("reservation_time") @db.Time()
+  adultCount          Int                  @map("adult_count")
+  childCount          Int                  @map("child_count")
+  mealType            MealType             @map("meal_type")
+  totalAmount         Decimal              @map("total_amount") @db.Decimal(10, 2)
+  serviceCharge       Decimal              @map("service_charge") @db.Decimal(10, 2)
+  taxAmount           Decimal              @map("tax_amount") @db.Decimal(10, 2)
+  advancePaymentAmount Decimal?            @map("advance_payment_amount") @db.Decimal(10, 2)
+  remainingPaymentAmount Decimal?          @map("remaining_payment_amount") @db.Decimal(10, 2)
+  status              String
+  specialRequests     String?              @map("special_requests")
+  dietaryRequirements String?              @map("dietary_requirements")
+  occasion            String?
+  reservationType     ReservationType      @default(BUFFET_ONLY) @map("reservation_type")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  createdBy           RequestCreatorType   @default(CUSTOMER) @map("created_by")
+  restaurant          Restaurant           @relation(fields: [restaurantId], references: [id])
+  customer            Customer             @relation(fields: [customerId], references: [id])
+  request             ReservationRequest   @relation(fields: [requestId], references: [id])
+  payments            ReservationPayment[]
+  reviews             ReservationReview[]
+  promoCodeId         Int?                 @map("promo_code_id")
+  discountAmount      Decimal?             @map("discount_amount") @db.Decimal(10, 2)
+  promoCode           PromoCode?           @relation(fields: [promoCodeId], references: [id])
+  promoCodeUsage      PromoCodeUsage[]
+  cancellationRequests CancellationRequest[]
+  refundTransactions  RefundTransaction[]
+  modificationRequests ReservationModificationRequest[]
+  tableModificationRequests TableReservationModificationRequest[]
+  lastModifiedAt      DateTime?            @map("last_modified_at")
+  lastModifiedBy      String?              @map("last_modified_by")
+  lastModificationId  Int?                 @map("last_modification_id") @unique
+  modificationHistory ReservationModificationHistory[]
+  tableModificationHistory TableReservationModificationHistory[]
+  financialData       ReservationFinancialData? @relation("ReservationToFinancialData")
+  tableAssignment     ReservationTableAssignment?
+  tableSlots          TableAvailabilitySlot[]
+  appliedPolicies     ReservationAppliedPolicies[]
+  tableSets           TableSet[]
+
+  @@map("reservations")
+}
+
+model ReservationPayment {
+  id                   Int            @id @default(autoincrement()) @map("payment_id")
+  reservationId        Int?           @map("reservation_id")
+  modificationId       Int?           @map("modification_id")
+  paymentType          String         @default("RESERVATION") @map("payment_type") // "RESERVATION" or "MODIFICATION"
+  amount               Decimal        @db.Decimal(10, 2)
+  paymentDate          DateTime       @map("payment_date")
+  paymentStatus        PaymentStatus  @map("payment_status")
+  paymentChannel       PaymentChannel @map("payment_channel")
+  transactionReference String         @map("transaction_reference")
+  paymentNotes         String?        @map("payment_notes")
+  refundReason         String?        @map("refund_reason")
+  refundAmount         Decimal?       @map("refund_amount") @db.Decimal(10, 2)
+  refundDate           DateTime?      @map("refund_date")
+  processedBy          String         @map("processed_by")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+  reservation          Reservation?   @relation(fields: [reservationId], references: [id])
+  modification         ReservationModificationRequest? @relation(fields: [modificationId], references: [id])
+
+  @@index([modificationId])
+  @@map("reservation_payments")
+}
+
+model RestaurantSpecialClosure {
+  id           Int        @id @default(autoincrement()) @map("closure_id")
+  restaurantId Int        @map("restaurant_id")
+  closureStart DateTime   @map("closure_start")
+  closureEnd   DateTime   @map("closure_end")
+  closureType  String     @map("closure_type")
+  description  String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  createdBy    String     @map("created_by")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("restaurant_special_closures")
+}
+
+model ReservationRequest {
+  id                     Int                               @id @default(autoincrement()) @map("request_id")
+  restaurantId           Int                               @map("restaurant_id")
+  customerId             Int                               @map("customer_id")
+  requestName            String                            @map("request_name")
+  contactPhone           String                            @map("contact_phone")
+  requestedDate          DateTime                          @map("requested_date") @db.Date
+  requestedTime          DateTime                          @map("requested_time") @db.Time()
+  adultCount             Int                               @map("adult_count")
+  childCount             Int                               @map("child_count")
+  mealType               MealType                          @map("meal_type")
+  mealServiceId          Int?                              @map("meal_service_id")
+  estimatedTotalAmount   Decimal                           @map("estimated_total_amount") @db.Decimal(10, 2)
+  estimatedServiceCharge Decimal                           @map("estimated_service_charge") @db.Decimal(10, 2)
+  estimatedTaxAmount     Decimal                           @map("estimated_tax_amount") @db.Decimal(10, 2)
+  status                 ReservationRequestStatus          @default(PENDING) @map("status")
+  specialRequests        String?                           @map("special_requests")
+  dietaryRequirements    String?                           @map("dietary_requirements")
+  occasion               String?
+  rejectionReason        String?                           @map("rejection_reason")
+  reservationType        ReservationType                   @default(BUFFET_ONLY) @map("reservation_type")
+  
+  createdAt              DateTime                          @default(now()) @map("created_at")
+  processingStartedAt    DateTime?                         @map("processing_started_at")
+  processingCompletedAt  DateTime?                         @map("processing_completed_at")
+  updatedAt              DateTime                          @updatedAt @map("updated_at")
+  createdBy              RequestCreatorType                @default(CUSTOMER) @map("created_by")
+  requiresAdvancePayment Boolean                           @default(true) @map("requires_advance_payment")
+  restaurant             Restaurant                        @relation(fields: [restaurantId], references: [id])
+  customer               Customer                          @relation(fields: [customerId], references: [id])
+  mealService            RestaurantMealService?            @relation(fields: [mealServiceId], references: [id])
+  statusHistory          ReservationRequestStatusHistory[]
+  payments               ReservationRequestPayment[]
+  reservation            Reservation?
+  promoCodeId            Int?                              @map("promo_code_id")
+  estimatedDiscountAmount Decimal?                         @map("estimated_discount_amount") @db.Decimal(10, 2)
+  promoCode              PromoCode?                        @relation(fields: [promoCodeId], references: [id])
+  
+  // Track how many people the promo code discount was applied to
+  eligiblePromoPartySize Int?                              @map("eligible_promo_party_size")
+  
+  promoCodeUsages        PromoCodeUsage[]
+  restaurantPaymentLink  RestaurantPaymentLink?
+  tableDetails           ReservationRequestTableDetails?
+  tableHolds             ReservationTableHold[]
+  appliedPolicies        ReservationAppliedPolicies[]
+
+  @@map("reservation_requests")
+}
+
+model ReservationRequestStatusHistory {
+  id              Int                @id @default(autoincrement()) @map("history_id")
+  requestId       Int                @map("request_id")
+  previousStatus  String             @map("previous_status")
+  newStatus       String             @map("new_status")
+  changeReason    String             @map("change_reason")
+  statusChangedAt DateTime           @map("status_changed_at")
+  changedBy       String             @map("changed_by")
+  request         ReservationRequest @relation(fields: [requestId], references: [id])
+
+  @@map("reservation_request_status_history")
+}
+
+model ReservationRequestPayment {
+  id                   Int                @id @default(autoincrement()) @map("payment_attempt_id")
+  requestId            Int                @map("request_id")
+  amount               Decimal            @db.Decimal(10, 2)
+  paymentInitiatedAt   DateTime           @map("payment_initiated_at")
+  paymentStatus        PaymentStatus      @map("payment_status")
+  paymentProvider      String             @map("payment_provider")
+  paymentChannel       PaymentChannel     @map("payment_channel")
+  transactionReference String             @map("transaction_reference")
+  nameOnCard           String?            @map("name_on_card")
+  maskedCardNumber     String?            @map("masked_card_number")
+  failureReason        String?            @map("failure_reason")
+  notifiedAt           DateTime?          @map("notified_at")
+  verifiedAt           DateTime?          @map("verified_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  request              ReservationRequest @relation(fields: [requestId], references: [id])
+  paymentStatusUrl     String?            @map("payment_status_url")
+
+  @@map("reservation_request_payments")
+}
+
+model ReservationReview {
+  id               Int                         @id @default(autoincrement()) @map("review_id")
+  reservationId    Int                         @map("reservation_id")
+  customerId       Int                         @map("customer_id")
+  mealRating       Int                         @map("meal_rating")
+  serviceRating    Int                         @map("service_rating")
+  platformRating   Int                         @map("platform_rating")
+  reviewText       String?                     @map("review_text") @db.Text
+  isVerified       Boolean                     @default(false) @map("is_verified")
+  isPublished      Boolean                     @default(false) @map("is_published")
+  diningDate       DateTime                    @map("dining_date")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+  moderationStatus String                      @map("moderation_status")
+  moderationNotes  String?                     @map("moderation_notes")
+  moderatedAt      DateTime?                   @map("moderated_at")
+  moderatedBy      String?                     @map("moderated_by")
+  reservation      Reservation                 @relation(fields: [reservationId], references: [id])
+  customer         Customer                    @relation(fields: [customerId], references: [id])
+  photos           ReservationReviewPhoto[]
+  responses        ReservationReviewResponse[]
+
+  @@map("reservation_reviews")
+}
+
+model ReservationReviewPhoto {
+  id           Int               @id @default(autoincrement()) @map("photo_id")
+  reviewId     Int               @map("review_id")
+  photoUrl     String            @map("photo_url")
+  photoCaption String?           @map("photo_caption")
+  uploadedAt   DateTime          @default(now()) @map("uploaded_at")
+  isApproved   Boolean           @default(false) @map("is_approved")
+  approvedAt   DateTime?         @map("approved_at")
+  approvedBy   String?           @map("approved_by")
+  review       ReservationReview @relation(fields: [reviewId], references: [id])
+
+  @@map("reservation_review_photos")
+}
+
+model ReservationReviewResponse {
+  id           Int               @id @default(autoincrement()) @map("response_id")
+  reviewId     Int               @map("review_id")
+  responseText String            @map("response_text") @db.Text
+  respondedBy  String            @map("responded_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  isPublished  Boolean           @default(false) @map("is_published")
+  review       ReservationReview @relation(fields: [reviewId], references: [id])
+
+  @@map("reservation_review_responses")
+}
+
+model City {
+  id                Int                     @id @default(autoincrement()) @map("city_id")
+  cityName          String                  @map("city_name")
+  stateName         String                  @map("state_name")
+  countryName       String                  @map("country_name")
+  latitude          Decimal                 @db.Decimal(10, 8)
+  longitude         Decimal                 @db.Decimal(11, 8)
+  postalCodePattern String                  @map("postal_code_pattern")
+  isActive          Boolean                 @default(true) @map("is_active")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  serviceAreas      RestaurantServiceArea[]
+
+  @@map("cities")
+}
+
+model RestaurantServiceArea {
+  restaurantId             Int        @map("restaurant_id")
+  cityId                   Int        @map("city_id")
+  deliveryRadiusKm         Decimal    @map("delivery_radius_km") @db.Decimal(10, 2)
+  estimatedDeliveryTimeMin Int        @map("estimated_delivery_time_min")
+  isActive                 Boolean    @default(true) @map("is_active")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  createdBy                String     @map("created_by")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+  updatedBy                String     @map("updated_by")
+  restaurant               Restaurant @relation(fields: [restaurantId], references: [id])
+  city                     City       @relation(fields: [cityId], references: [id])
+
+  @@id([restaurantId, cityId])
+  @@map("restaurant_service_areas")
+}
+
+model Notification {
+  id            Int       @id @default(autoincrement()) @map("notification_id")
+  restaurantId  Int       @map("restaurant_id")
+  type          NotificationType
+  title         String
+  message       String
+  metadata      Json?
+  isRead        Boolean   @default(false) @map("is_read")
+  readOn        DateTime? @map("read_on")
+  readBy        String?   @map("read_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@map("notifications")
+}
+
+
+model CleanupLog {
+  id                Int         @id @default(autoincrement()) @map("log_id")
+  cleanupType       String      @map("cleanup_type")
+  restaurantId      Int         @map("restaurant_id")
+  recordsRemoved    Int         @map("records_removed")
+  cleanupStartTime  DateTime    @map("cleanup_start_time")
+  cleanupEndTime    DateTime    @map("cleanup_end_time")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  restaurant        Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@map("cleanup_logs")
+}
+
+model CancellationRequest {
+  id                Int               @id @default(autoincrement()) @map("cancellation_id")
+  reservationId     Int               @map("reservation_id")
+  restaurantId      Int               @map("restaurant_id")
+  requestedBy       CancellationRequestedBy
+  requestedById     Int               @map("requested_by_id")
+  requestedAt       DateTime          @default(now()) @map("requested_at")
+  status            CancellationStatus @default(PENDING_REVIEW)
+  reason            String            @db.Text
+  reasonCategory    CancellationReasonCategory
+  additionalNotes   String?           @db.Text @map("additional_notes")
+  processedAt       DateTime?         @map("processed_at")
+  processedBy       String?           @map("processed_by")
+  refundAmount      Decimal?          @map("refund_amount") @db.Decimal(10, 2)
+  refundPercentage  Int?              @map("refund_percentage")
+  refundNotes       String?           @map("refund_notes")
+  windowType        CancellationWindowType @default(NO_REFUND) @map("window_type")
+  tableSetId        Int?              @map("table_set_id")
+  mergedTableCount  Int               @default(1) @map("merged_table_count")
+  releasedSlotIds   Int[]             @default([]) @map("released_slot_ids")
+  slotReleaseCompletedAt DateTime?    @map("slot_release_completed_at")
+  reservation       Reservation       @relation(fields: [reservationId], references: [id])
+  refundTransactions RefundTransaction[]
+  restaurant        Restaurant        @relation(fields: [restaurantId], references: [id])
+  tableSet          TableSet?         @relation(fields: [tableSetId], references: [id])
+
+  @@index([tableSetId], map: "idx_cancellation_requests_table_set_id")
+  @@index([slotReleaseCompletedAt], map: "idx_cancellation_requests_slot_release_completed")
+  @@map("cancellation_requests")
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum MealType {
+  BREAKFAST
+  BRUNCH
+  LUNCH
+  HIGH_TEA
+  DINNER
+  SPECIAL
+}
+
+enum PaymentStatus {
+  INITIATED
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentChannel {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  DIGITAL_WALLET
+  CASH
+  OTHER
+}
+
+enum ReservationRequestStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  COMPLETED
+  MERCHANT_INITIATED
+  PENDING_CUSTOMER_PAYMENT
+  PAYMENT_LINK_EXPIRED
+  PROCESSING
+  SLOTS_NOT_AVAILABLE
+  TIMEOUT
+  PAYMENT_FAILED
+  MEAL_SERVICE_NOT_AVAILABLE
+  ERROR
+}
+
+enum NotificationType {
+  RESERVATION_REQUEST
+  RESERVATION_CONFIRMED
+  RESERVATION_CANCELLED
+  RESERVATION_MODIFIED
+  MODIFICATION_REQUESTED
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  REVIEW_POSTED
+  SYSTEM_ALERT
+}
+
+enum CancellationRequestedBy {
+  CUSTOMER
+  MERCHANT
+  SYSTEM
+}
+
+enum CancellationStatus {
+  PENDING_REVIEW      // Initial state when request is created
+  APPROVED_PENDING_REFUND // Cancellation approved, waiting for refund processing
+  APPROVED_REFUNDED   // Cancellation approved and refund completed
+  APPROVED_NO_REFUND  // Cancellation approved but no refund applicable
+  REJECTED           // Cancellation request rejected
+  CANCELLED          // Request cancelled by requester
+}
+
+enum CancellationWindowType {
+  FREE       // Full refund window
+  PARTIAL    // Partial refund window
+  NO_REFUND  // No refund window
+}
+
+enum CancellationReasonCategory {
+  CHANGE_OF_PLANS
+  EMERGENCY
+  WEATHER
+  RESTAURANT_ISSUE
+  DOUBLE_BOOKING
+  SYSTEM_ERROR
+  OTHER
+}
+
+enum RefundType {
+  FULL
+  PARTIAL
+  NONE
+}
+
+model RestaurantRefundPolicy {
+  id                      Int        @id @default(autoincrement()) @map("policy_id")
+  restaurantId            Int        @map("restaurant_id")
+  mealType               MealType    @map("meal_type")
+  allowedRefundTypes     RefundType[] @map("allowed_refund_types")
+  fullRefundBeforeMinutes Int        @map("full_refund_before_minutes")
+  partialRefundBeforeMinutes Int?    @map("partial_refund_before_minutes") // Optional now
+  partialRefundPercentage   Int?     @map("partial_refund_percentage") // Optional now
+  isActive               Boolean     @default(true) @map("is_active")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
+  createdBy              String      @map("created_by")
+  updatedBy              String      @map("updated_by")
+  restaurant             Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, mealType])
+  @@map("restaurant_refund_policies")
+}
+
+enum RefundReason {
+  RESERVATION_CANCELLATION
+  RESERVATION_MODIFICATION
+  PAX_MODIFICATION
+  SPECIAL_CIRCUMSTANCE
+  CUSTOMER_COMPLAINT
+  MERCHANT_INITIATED
+  SYSTEM_ERROR
+}
+
+model RefundTransaction {
+  id                Int       @id @default(autoincrement()) @map("refund_id")
+  reservationId     Int       @map("reservation_id")
+  restaurantId      Int        @map("restaurant_id")
+  cancellationId    Int?      @map("cancellation_id") // Optional - might be PAX modification
+  amount            Decimal   @db.Decimal(10, 2)
+  reason            RefundReason
+  status            RefundStatus
+  processedAt       DateTime? @map("processed_at")
+  processedBy       String?   @map("processed_by")
+  transactionReference String? @map("transaction_reference")
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  restaurant        Restaurant @relation(fields: [restaurantId], references: [id])
+
+  reservation       Reservation        @relation(fields: [reservationId], references: [id])
+  cancellation      CancellationRequest? @relation(fields: [cancellationId], references: [id])
+  modificationRequest ReservationModificationRequest? @relation(fields: [modificationRequestId], references: [id])
+  modificationRequestId Int? @unique @map("modification_request_id")
+
+  @@map("refund_transactions")
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+// Reservation support configuration at restaurant-level
+enum ReservationSupportType {
+  BUFFET_ONLY
+  TABLE_ONLY
+  BOTH
+}
+
+// For per-reservation chosen type
+enum ReservationType {
+  BUFFET_ONLY
+  TABLE_ONLY
+  BUFFET_AND_TABLE
+}
+
+// Table slot lifecycle
+enum TableSlotStatus {
+  AVAILABLE
+  HELD
+  RESERVED
+  BLOCKED
+  MAINTENANCE
+}
+
+// Generic fee type
+enum FeeType {
+  PERCENTAGE
+  FIXED
+}
+
+// Add new enums for promo codes
+enum DiscountType {
+  PERCENTAGE_OFF
+  FIXED_AMOUNT_OFF
+}
+
+enum CampaignType {
+  PLATFORM
+  MERCHANT
+}
+
+// Table Set Status for merged tables
+enum TableSetStatus {
+  PENDING_MERGE     // Step 1: Drag-drop done, 15-min timer started
+  ACTIVE            // Step 2: Merge confirmed
+  DISSOLVED         // Unmerged
+  EXPIRED           // Auto-cleaned after 15 min
+}
+
+model PromoCode {
+  id                    Int                         @id @default(autoincrement())
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  code                 String                      @unique
+  description          String
+  campaignType         CampaignType               @default(PLATFORM) @map("campaign_type")
+  discountType         DiscountType
+  discountValue        Decimal
+  minimumOrderValue    Decimal
+  maximumDiscountAmount Decimal
+  usageLimitPerUser    Int
+  usageLimitTotal      Int
+  timesUsed           Int                         @default(0)
+  partySizeLimit       Int                         @default(100)
+  partySizeLimitPerUser Int                        @default(10)
+  partySizeUsed        Int                         @default(0)
+  buffetTypes          MealType[]                  @default([]) @map("buffet_types")
+  isActive            Boolean                     @default(true)
+  isDeleted           Boolean                     @default(false) @map("is_deleted")
+  firstOrderOnly      Boolean                     @default(false) @map("first_order_only")
+  validFrom           DateTime
+  validUntil          DateTime
+  createdBy           String
+  updatedBy           String
+  restaurantMappings   PromoCodeRestaurantMapping[]
+  customerMappings     PromoCodeCustomerMapping[]
+  usageRecords        PromoCodeUsage[]
+  reservations        Reservation[]
+  reservationRequests ReservationRequest[]
+  modificationRequests ReservationModificationRequest[] @relation("OriginalPromoCode")
+}
+
+model PromoCodeRestaurantMapping {
+  id           Int        @id @default(autoincrement()) @map("mapping_id")
+  promoCodeId  Int        @map("promo_code_id")
+  restaurantId Int        @map("restaurant_id")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  promoCode    PromoCode  @relation(fields: [promoCodeId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("promo_code_restaurant_mappings")
+}
+
+model PromoCodeCustomerMapping {
+  id           Int        @id @default(autoincrement()) @map("mapping_id")
+  promoCodeId  Int        @map("promo_code_id")
+  customerId   Int        @map("customer_id")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  promoCode    PromoCode  @relation(fields: [promoCodeId], references: [id])
+  customer     Customer   @relation(fields: [customerId], references: [id])
+
+  @@map("promo_code_customer_mappings")
+}
+
+model PromoCodeUsage {
+  id                Int       @id @default(autoincrement())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  promoCode         PromoCode @relation(fields: [promoCodeId], references: [id])
+  promoCodeId       Int
+  reservation       Reservation @relation(fields: [reservationId], references: [id])
+  reservationId     Int
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  customerId        Int
+  originalRequest   ReservationRequest @relation(fields: [originalRequestId], references: [id])
+  originalRequestId Int
+  originalAmount    Decimal
+  discountAmount    Decimal
+  partySize         Int
+  appliedAt         DateTime  @default(now())
+  appliedBy         String
+
+  @@index([promoCodeId])
+  @@index([reservationId])
+  @@index([customerId])
+  @@index([originalRequestId])
+}
+
+enum EmailStatus {
+  FAILED
+  RETRY_PENDING
+  RETRY_SUCCESS
+  RETRY_FAILED
+  ABANDONED
+}
+
+enum PortalType {
+  MERCHANT
+  GUEST
+  ADMIN
+}
+
+model FailedEmail {
+  id                Int         @id @default(autoincrement()) @map("failed_email_id")
+  reservationId     Int?        @map("reservation_id")
+  restaurantId      Int?        @map("restaurant_id")
+  portalType        PortalType  @map("portal_type")
+  emailType         String      @map("email_type") // e.g., "CANCELLATION", "CONFIRMATION"
+  recipient         String
+  subject           String
+  templateData      Json        @map("template_data")
+  errorMessage      String      @map("error_message")
+  retryCount        Int         @default(0) @map("retry_count")
+  status            EmailStatus @default(FAILED)
+  lastRetryAt       DateTime?   @map("last_retry_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([reservationId])
+  @@index([restaurantId])
+  @@index([portalType])
+  @@map("failed_emails")
+}
+
+enum KeycloakRole {
+  admin
+  IT
+  Finance
+  Staff
+}
+
+model MerchantUsers {
+  id          String    @id @map("keycloak_user_id") // The ID returned from Keycloak
+  businessId  String    @map("business_id")
+  role        KeycloakRole? @map("role")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("merchant_users")
+}
+
+// Add these models for reservation modification
+
+enum ModificationStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  PAYMENT_PENDING
+  PAYMENT_FAILED
+  COMPLETED
+  CANCELLED
+}
+
+enum ModificationType {
+  DATE_TIME
+  PARTY_SIZE
+  MEAL_TYPE
+  BOTH
+  OTHER
+}
+
+model ReservationModificationRequest {
+  id                  Int                                 @id @default(autoincrement()) @map("modification_id")
+  reservationId       Int                                 @map("reservation_id")
+  restaurantId        Int                                 @map("restaurant_id")
+  requestedBy         String                              @map("requested_by") // User ID or "CUSTOMER" or "MERCHANT"
+  modificationTypes   ModificationType[]                  @map("modification_types")
+  requestedAt         DateTime                            @default(now()) @map("requested_at")
+  status              ModificationStatus                  @default(PENDING)
+  
+  // Original details
+  originalDate        DateTime                            @map("original_date") @db.Date
+  originalTime        DateTime                            @map("original_time") @db.Time()
+  originalAdultCount  Int                                 @map("original_adult_count")
+  originalChildCount  Int                                 @map("original_child_count")
+  originalMealType    MealType                            @map("original_meal_type")
+  originalAmount      Decimal                             @map("original_amount") @db.Decimal(10, 2)
+  originalServiceCharge Decimal                           @map("original_service_charge") @db.Decimal(10, 2)
+  originalTaxAmount   Decimal                             @map("original_tax_amount") @db.Decimal(10, 2)
+  originalAdvancePaymentAmount Decimal?                   @map("original_advance_payment_amount") @db.Decimal(10, 2)
+  originalRemainingPaymentAmount Decimal?                 @map("original_remaining_payment_amount") @db.Decimal(10, 2)
+  
+  // Original promo code details (if applicable)
+  originalPromoCodeId Int?                                @map("original_promo_code_id")
+  originalDiscountAmount Decimal?                         @map("original_discount_amount") @db.Decimal(10, 2)
+  
+  // New requested details
+  newDate             DateTime?                           @map("new_date") @db.Date
+  newTime             DateTime?                           @map("new_time") @db.Time()
+  newAdultCount       Int?                                @map("new_adult_count")
+  newChildCount       Int?                                @map("new_child_count")
+  newMealType         MealType?                           @map("new_meal_type")
+  
+  // Financial details
+  newAmount           Decimal?                            @map("new_amount") @db.Decimal(10, 2)
+  newServiceCharge    Decimal?                            @map("new_service_charge") @db.Decimal(10, 2)
+  newTaxAmount        Decimal?                            @map("new_tax_amount") @db.Decimal(10, 2)
+  newDiscountAmount   Decimal?                            @map("new_discount_amount") @db.Decimal(10, 2)
+  newAdvancePaymentAmount Decimal?                        @map("new_advance_payment_amount") @db.Decimal(10, 2)
+  newRemainingPaymentAmount Decimal?                      @map("new_remaining_payment_amount") @db.Decimal(10, 2)
+  priceDifference     Decimal?                            @map("price_difference") @db.Decimal(10, 2)
+  additionalPaymentRequired Boolean                       @default(false) @map("additional_payment_required")
+  refundRequired      Boolean                             @default(false) @map("refund_required")
+  
+  // Processing details
+  processedAt         DateTime?                           @map("processed_at")
+  processedBy         String?                             @map("processed_by")
+  rejectionReason     String?                             @map("rejection_reason")
+  notes               String?                             @db.Text
+  
+  // Promo code adjustment info
+  promoCodeReapplied   Boolean?                          @map("promo_code_reapplied")
+  promoCodeAdjustmentNotes String?                        @map("promo_code_adjustment_notes")
+  
+  // Capacity adjustment tracking
+  seatsReleased       Int?                                @map("seats_released")
+  seatsReserved       Int?                                @map("seats_reserved")
+  capacityAdjustedAt  DateTime?                           @map("capacity_adjusted_at")
+  
+  // Relationships
+  reservation         Reservation                         @relation(fields: [reservationId], references: [id])
+  restaurant          Restaurant                          @relation(fields: [restaurantId], references: [id])
+  statusHistory       ReservationModificationStatusHistory[]
+  payments            ReservationPayment[]
+  refundTransaction   RefundTransaction?
+  originalPromoCode   PromoCode?                          @relation("OriginalPromoCode", fields: [originalPromoCodeId], references: [id])
+  modificationHistory ReservationModificationHistory[]
+
+  @@index([reservationId])
+  @@index([restaurantId])
+  @@index([status])
+  @@map("reservation_modification_requests")
+}
+
+model ReservationModificationStatusHistory {
+  id                  Int                     @id @default(autoincrement()) @map("history_id")
+  modificationId      Int                     @map("modification_id")
+  previousStatus      ModificationStatus?     @map("previous_status")
+  newStatus           ModificationStatus      @map("new_status")
+  changeReason        String                  @map("change_reason")
+  statusChangedAt     DateTime                @map("status_changed_at")
+  changedBy           String                  @map("changed_by")
+  
+  modification        ReservationModificationRequest @relation(fields: [modificationId], references: [id])
+
+  @@map("reservation_modification_status_history")
+}
+
+// Add a new model to track modification history in the reservation
+model ReservationModificationHistory {
+    id                  Int          @id @default(autoincrement()) @map("history_id")
+    reservationId       Int          @map("reservation_id")
+    modificationId      Int          @map("modification_id")
+    
+    // Previous values before modification
+    previousDate        DateTime     @map("previous_date") @db.Date
+    previousTime        DateTime     @map("previous_time") @db.Time()
+    previousAdultCount  Int          @map("previous_adult_count")
+    previousChildCount  Int          @map("previous_child_count")
+    previousMealType    MealType     @map("previous_meal_type")
+    previousAmount      Decimal      @map("previous_amount") @db.Decimal(10, 2)
+    previousServiceCharge Decimal    @map("previous_service_charge") @db.Decimal(10, 2)
+    previousTaxAmount   Decimal      @map("previous_tax_amount") @db.Decimal(10, 2)
+    previousDiscountAmount Decimal?  @map("previous_discount_amount") @db.Decimal(10, 2)
+    previousAdvancePaymentAmount Decimal? @map("previous_advance_payment_amount") @db.Decimal(10, 2)
+    previousRemainingPaymentAmount Decimal? @map("previous_remaining_payment_amount") @db.Decimal(10, 2)
+    
+    // New values after modification
+    newDate             DateTime     @map("new_date") @db.Date
+    newTime             DateTime     @map("new_time") @db.Time()
+    newAdultCount       Int          @map("new_adult_count")
+    newChildCount       Int          @map("new_child_count")
+    newMealType         MealType     @map("new_meal_type")
+    newAmount           Decimal      @map("new_amount") @db.Decimal(10, 2)
+    newServiceCharge    Decimal      @map("new_service_charge") @db.Decimal(10, 2)
+    newTaxAmount        Decimal      @map("new_tax_amount") @db.Decimal(10, 2)
+    newDiscountAmount   Decimal?     @map("new_discount_amount") @db.Decimal(10, 2)
+    newAdvancePaymentAmount Decimal? @map("new_advance_payment_amount") @db.Decimal(10, 2)
+    newRemainingPaymentAmount Decimal? @map("new_remaining_payment_amount") @db.Decimal(10, 2)
+    
+    modifiedAt          DateTime     @default(now()) @map("modified_at")
+    modifiedBy          String       @map("modified_by")
+    
+    reservation         Reservation  @relation(fields: [reservationId], references: [id])
+    modification       ReservationModificationRequest @relation(fields: [modificationId], references: [id])
+
+    @@map("reservation_modification_history")
+}
+
+model ReservationFinancialData {
+  id                  Int          @id @default(autoincrement()) @map("financial_id")
+  reservationId       Int          @unique @map("reservation_id")
+  netBuffetPrice      Decimal      @map("net_buffet_price") @db.Decimal(10, 2)
+  taxAmount           Decimal      @map("tax_amount") @db.Decimal(10, 2)
+  serviceCharge       Decimal      @map("service_charge") @db.Decimal(10, 2)
+  totalBeforeDiscount Decimal      @map("total_before_discount") @db.Decimal(10, 2)
+  discount            Decimal      @map("discount") @db.Decimal(10, 2)
+  totalAfterDiscount  Decimal      @map("total_after_discount") @db.Decimal(10, 2)
+  advancePayment      Decimal      @map("advance_payment") @db.Decimal(10, 2)
+  balanceDue          Decimal      @map("balance_due") @db.Decimal(10, 2)
+  isPaid              Boolean      @default(false) @map("is_paid")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+  reservation         Reservation? @relation("ReservationToFinancialData", fields: [reservationId], references: [id])
+
+  @@map("reservation_financial_data")
+}
+
+// Add RequestCreatorType enum after existing enums
+enum RequestCreatorType {
+  CUSTOMER
+  MERCHANT  // Referred to as MERCHANT_CALL_IN
+  MERCHANT_WALK_IN   
+  SYSTEM
+  OTHER
+}
+
+// Add PaymentLinkStatus enum before the model that uses it
+enum PaymentLinkStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+model RestaurantPaymentLink {
+  id          Int      @id @default(autoincrement()) @map("id")
+  requestId   Int      @unique @map("request_id")
+  token       String   @unique @map("token")
+  status      PaymentLinkStatus @default(ACTIVE) @map("status")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  request     ReservationRequest @relation(fields: [requestId], references: [id])
+
+  @@map("restaurant_payment_links")
+}
+
+model RestaurantPlatter {
+  id                      Int                  @id @default(autoincrement()) @map("platter_id")
+  restaurantId            Int                  @map("restaurant_id")
+  mealServiceId           Int                  @map("meal_service_id")
+  platterName             String               @map("platter_name") @db.VarChar(100)
+  platterDescription      String?              @map("platter_description") @db.Text
+  headCount               Int                  @map("head_count")
+  
+  // Pricing Structure
+  adultGrossPrice         Decimal              @map("adult_gross_price") @db.Decimal(10, 2)
+  childGrossPrice         Decimal              @map("child_gross_price") @db.Decimal(10, 2)
+  adultNetPrice           Decimal              @map("adult_net_price") @db.Decimal(10, 2)
+  childNetPrice           Decimal              @map("child_net_price") @db.Decimal(10, 2)
+  
+  // Configuration
+  isActive                Boolean              @default(true) @map("is_active")
+  displayOrder            Int?                 @map("display_order")
+  isDefault               Boolean              @default(false) @map("is_default")
+  
+  // Metadataniin ja sit on se aspekti et välil suomalaiset vaan puhuu niin nästyjä et parempiki ettei pysty kääntelee enkuks 
+  features                Json?                @map("features")
+  images                  Json?                @map("images")
+  
+  // Timestamps
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
+  createdBy               String               @map("created_by") @db.VarChar(50)
+  updatedBy               String               @map("updated_by") @db.VarChar(50)
+  
+  // Relationships
+  restaurant              Restaurant           @relation(fields: [restaurantId], references: [id])
+  mealService             RestaurantMealService @relation(fields: [mealServiceId], references: [id])
+  
+  @@unique([restaurantId, mealServiceId, platterName])
+  @@index([restaurantId, mealServiceId])
+  @@map("restaurant_platters")
+}
+
+// New models for Table Reservation (Phase 1)
+model RestaurantSection {
+  id            Int         @id @default(autoincrement()) @map("section_id")
+  restaurantId  Int         @map("restaurant_id")
+  sectionName   String      @map("section_name")
+  description   String?
+  isActive      Boolean     @default(true) @map("is_active")
+  displayOrder  Int?        @map("display_order")
+  capacity      Int?
+  
+  // Fabric.js Canvas Data
+  canvasData    Json?       @map("canvas_data") // Stores Fabric.js canvas JSON
+  canvasWidth   Int?        @default(800) @map("canvas_width")
+  canvasHeight  Int?        @default(600) @map("canvas_height")
+  floorPlanImage String?    @map("floor_plan_image") // Background floor plan image URL
+  isCanvasEnabled Boolean   @default(false) @map("is_canvas_enabled")
+  
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id])
+  tables        RestaurantTable[]
+  requestPreferences ReservationRequestTableDetails[]
+  assignments   ReservationTableAssignment[]
+
+  @@index([restaurantId])
+  @@map("restaurant_sections")
+}
+
+model RestaurantTable {
+  id               Int               @id @default(autoincrement()) @map("table_id")
+  restaurantId     Int               @map("restaurant_id")
+  sectionId        Int               @map("section_id")
+  tableName        String            @map("table_name")
+  seatingCapacity  Int               @map("seating_capacity")
+  tableType        String?           @map("table_type")
+  isActive         Boolean           @default(true) @map("is_active")
+  
+  // Enhanced Fabric.js Support
+  position         Json?             @map("position") // Canvas position {x, y, width, height, angle}
+  amenities        Json?             @map("amenities") // Table amenities and properties
+  fabricObjectId   String?           @map("fabric_object_id") // Fabric.js object ID for synchronization
+  canvasProperties Json?             @map("canvas_properties") // Fabric.js specific properties (fill, stroke, etc.)
+  isDraggable      Boolean           @default(true) @map("is_draggable")
+  isResizable      Boolean           @default(true) @map("is_resizable")
+  
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  restaurant       Restaurant        @relation(fields: [restaurantId], references: [id])
+  section          RestaurantSection @relation(fields: [sectionId], references: [id])
+  availability     TableAvailabilitySlot[]
+  requestPreferences ReservationRequestTableDetails[]
+  assignments      ReservationTableAssignment[]
+  slotGenerationConfigs TableSlotGenerationConfig[] @relation("TableSlotGenerationConfigTables")
+
+  @@unique([restaurantId, tableName])
+  @@index([restaurantId, sectionId, isActive])
+  @@index([fabricObjectId])
+  @@map("restaurant_tables")
+}
+
+model TableAvailabilitySlot {
+  id            Int               @id @default(autoincrement()) @map("slot_id")
+  restaurantId  Int               @map("restaurant_id")
+  tableId       Int               @map("table_id")
+  date          DateTime          @db.Date
+  startTime     DateTime          @map("start_time") @db.Time()
+  endTime       DateTime          @map("end_time") @db.Time()
+  status        TableSlotStatus   @default(AVAILABLE)
+  reservationId Int?              @map("reservation_id")
+  holdExpiresAt DateTime?         @map("hold_expires_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  restaurant    Restaurant        @relation(fields: [restaurantId], references: [id])
+  table         RestaurantTable   @relation(fields: [tableId], references: [id])
+  reservation   Reservation?      @relation(fields: [reservationId], references: [id])
+  assignments   ReservationTableAssignment[]
+  holds         ReservationTableHold[]
+
+  @@unique([tableId, date, startTime, endTime])
+  @@index([restaurantId, date, status])
+  @@index([holdExpiresAt])
+  @@map("table_availability_slots")
+}
+
+model TableReservationUtilsConfiguration {
+  id                       Int        @id @default(autoincrement()) @map("config_id")
+  restaurantId             Int?       @map("restaurant_id")
+  feeType                  FeeType    @map("fee_type")
+  feeValue                 Decimal    @map("fee_value") @db.Decimal(10, 2)
+  requiresAdvancePayment   Boolean    @default(true) @map("requires_advance_payment")
+  advancePaymentType       FeeType?   @map("advance_payment_type")
+  advancePaymentValue      Decimal?   @map("advance_payment_value") @db.Decimal(10, 2)
+  defaultSlotMinutes       Int        @default(90) @map("default_slot_minutes")
+  turnoverBufferMinutes    Int        @default(15) @map("turnover_buffer_minutes")
+  enableTemporaryHold      Boolean    @default(true) @map("enable_temporary_hold")
+  holdMinutes              Int        @default(10) @map("hold_minutes")
+  allowFlexibleAssignment  Boolean    @default(true) @map("allow_flexible_assignment")
+  defaultDwellMinutes      Int        @default(90) @map("default_dwell_minutes")
+  isActive                 Boolean    @default(true) @map("is_active")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+  restaurant               Restaurant? @relation(fields: [restaurantId], references: [id])
+  slotGenerationConfig    TableSlotGenerationConfig?
+
+  @@index([restaurantId])
+  @@map("table_reservation_utils_configuration")
+}
+
+// Slot generation configuration for automatic slot creation
+model TableSlotGenerationConfig {
+  id                    Int         @id @default(autoincrement()) @map("config_id")
+  tableReservationConfigId Int      @map("table_reservation_config_id")
+  isActive              Boolean     @default(true) @map("is_active")
+  
+  // Time configuration
+  startTime             DateTime    @map("start_time") @db.Time() // Daily start time for slot generation
+  slotDurationMinutes   Int         @default(90) @map("slot_duration_minutes")
+  turnoverBufferMinutes Int         @default(15) @map("turnover_buffer_minutes")
+  advanceBookingDays    Int         @default(30) @map("advance_booking_days")
+  
+  // Schedule configuration
+  enabledDays           DayOfWeek[] @default([MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]) @map("enabled_days")
+  
+  // Relations
+  tableReservationConfig TableReservationUtilsConfiguration @relation(fields: [tableReservationConfigId], references: [id])
+  targetTables          RestaurantTable[] @relation("TableSlotGenerationConfigTables")
+  
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+  createdBy             String      @map("created_by")
+  updatedBy             String      @map("updated_by")
+
+  @@unique([tableReservationConfigId])
+  @@map("table_slot_generation_configs")
+}
+
+// Table reservation detail tables (Phase 1 clean separation)
+
+model ReservationRequestTableDetails {
+  requestId              Int                   @id @map("request_id")
+  preferredSectionId     Int?                  @map("preferred_section_id")
+  preferredTableId       Int?                  @map("preferred_table_id")
+  preferredTimeSlotStart DateTime?             @map("preferred_time_slot_start")
+  preferredTimeSlotEnd   DateTime?             @map("preferred_time_slot_end")
+  isFlexibleWithTable    Boolean               @default(true) @map("is_flexible_with_table")
+  isFlexibleWithSection  Boolean               @default(true) @map("is_flexible_with_section")
+  isFlexibleWithTime     Boolean               @default(false) @map("is_flexible_with_time")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  request                ReservationRequest    @relation(fields: [requestId], references: [id])
+  preferredSection       RestaurantSection?    @relation(fields: [preferredSectionId], references: [id])
+  preferredTable         RestaurantTable?      @relation(fields: [preferredTableId], references: [id])
+
+  @@index([preferredSectionId])
+  @@index([preferredTableId])
+  @@index([preferredTimeSlotStart, preferredTimeSlotEnd])
+  @@map("reservation_request_table_details")
+}
+
+model ReservationTableAssignment {
+  reservationId       Int                      @id @map("reservation_id")
+  assignedSectionId   Int?                     @map("assigned_section_id")
+  assignedTableId     Int?                     @map("assigned_table_id")
+  slotId              Int?                     @map("slot_id")
+  tableStartTime      DateTime?                @map("table_start_time")
+  tableEndTime        DateTime?                @map("table_end_time")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  reservation         Reservation              @relation(fields: [reservationId], references: [id])
+  assignedSection     RestaurantSection?       @relation(fields: [assignedSectionId], references: [id])
+  assignedTable       RestaurantTable?         @relation(fields: [assignedTableId], references: [id])
+  slot                TableAvailabilitySlot?   @relation(fields: [slotId], references: [id])
+
+  @@index([assignedTableId])
+  @@index([slotId])
+  @@map("reservation_table_assignments")
+}
+
+model ReservationTableHold {
+  id            Int                      @id @default(autoincrement()) @map("hold_id")
+  requestId     Int                      @map("request_id")
+  slotId        Int                      @map("slot_id")
+  holdExpiresAt DateTime                 @map("hold_expires_at")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  request       ReservationRequest       @relation(fields: [requestId], references: [id])
+  slot          TableAvailabilitySlot    @relation(fields: [slotId], references: [id])
+
+  @@unique([slotId])
+  @@index([holdExpiresAt])
+  @@index([requestId])
+  @@map("reservation_table_holds")
+}
+
+// Add new enums for table reservation modification
+enum TableModificationType {
+  PARTY_SIZE
+  SECTION_ASSIGNMENT
+  TABLE_ASSIGNMENT
+  TIME_SLOT
+  SPECIAL_REQUESTS
+  BOTH
+  OTHER
+}
+
+enum TableModificationStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+// Add table reservation modification models
+model TableReservationModificationRequest {
+  id                  Int                                 @id @default(autoincrement()) @map("modification_id")
+  reservationId       Int                                 @map("reservation_id")
+  restaurantId        Int                                 @map("restaurant_id")
+  requestedBy         String                              @map("requested_by") // User ID or "CUSTOMER" or "MERCHANT"
+  modificationTypes   TableModificationType[]             @map("modification_types")
+  requestedAt         DateTime                            @default(now()) @map("requested_at")
+  status              TableModificationStatus             @default(PENDING)
+  
+  // Original details
+  originalAdultCount  Int                                 @map("original_adult_count")
+  originalChildCount  Int                                 @map("original_child_count")
+  originalSectionId   Int?                                @map("original_section_id")
+  originalTableId     Int?                                @map("original_table_id")
+  originalSlotId      Int?                                @map("original_slot_id")
+  originalTableStartTime DateTime?                        @map("original_table_start_time")
+  originalTableEndTime   DateTime?                        @map("original_table_end_time")
+  originalSpecialRequests String?                         @map("original_special_requests")
+  
+  // New requested details
+  newAdultCount       Int?                                @map("new_adult_count")
+  newChildCount       Int?                                @map("new_child_count")
+  newSectionId        Int?                                @map("new_section_id")
+  newTableId          Int?                                @map("new_table_id")
+  newSlotId           Int?                                @map("new_slot_id")
+  newTableStartTime   DateTime?                           @map("new_table_start_time")
+  newTableEndTime     DateTime?                           @map("new_table_end_time")
+  newSpecialRequests  String?                             @map("new_special_requests")
+  
+  // Processing details
+  processedAt         DateTime?                           @map("processed_at")
+  processedBy         String?                             @map("processed_by")
+  rejectionReason     String?                             @map("rejection_reason")
+  notes               String?                             @db.Text
+  
+  // Slot management tracking
+  originalSlotReleased Boolean                            @default(false) @map("original_slot_released")
+  newSlotReserved      Boolean                            @default(false) @map("new_slot_reserved")
+  slotAdjustedAt       DateTime?                          @map("slot_adjusted_at")
+  
+  // Relationships
+  reservation         Reservation                         @relation(fields: [reservationId], references: [id])
+  restaurant          Restaurant                          @relation(fields: [restaurantId], references: [id])
+  statusHistory       TableReservationModificationStatusHistory[]
+  modificationHistory TableReservationModificationHistory[]
+
+  @@index([reservationId])
+  @@index([restaurantId])
+  @@index([status])
+  @@map("table_reservation_modification_requests")
+}
+
+model TableReservationModificationStatusHistory {
+  id                  Int                     @id @default(autoincrement()) @map("history_id")
+  modificationId      Int                     @map("modification_id")
+  previousStatus      TableModificationStatus? @map("previous_status")
+  newStatus           TableModificationStatus @map("new_status")
+  changeReason        String                  @map("change_reason")
+  statusChangedAt     DateTime                @map("status_changed_at")
+  changedBy           String                  @map("changed_by")
+  
+  modification        TableReservationModificationRequest @relation(fields: [modificationId], references: [id])
+
+  @@map("table_reservation_modification_status_history")
+}
+
+// Add a new model to track table modification history
+model TableReservationModificationHistory {
+    id                  Int          @id @default(autoincrement()) @map("history_id")
+    reservationId       Int          @map("reservation_id")
+    modificationId      Int          @map("modification_id")
+    
+    // Previous values before modification
+    previousAdultCount  Int          @map("previous_adult_count")
+    previousChildCount  Int          @map("previous_child_count")
+    previousSectionId   Int?         @map("previous_section_id")
+    previousTableId     Int?         @map("previous_table_id")
+    previousSlotId      Int?         @map("previous_slot_id")
+    previousTableStartTime DateTime? @map("previous_table_start_time")
+    previousTableEndTime   DateTime? @map("previous_table_end_time")
+    previousSpecialRequests String?  @map("previous_special_requests")
+    
+    // New values after modification
+    newAdultCount       Int          @map("new_adult_count")
+    newChildCount       Int          @map("new_child_count")
+    newSectionId        Int?         @map("new_section_id")
+    newTableId          Int?         @map("new_table_id")
+    newSlotId           Int?         @map("new_slot_id")
+    newTableStartTime   DateTime?    @map("new_table_start_time")
+    newTableEndTime     DateTime?    @map("new_table_end_time")
+    newSpecialRequests  String?      @map("new_special_requests")
+    
+    modifiedAt          DateTime     @default(now()) @map("modified_at")
+    modifiedBy          String       @map("modified_by")
+    
+    reservation         Reservation  @relation(fields: [reservationId], references: [id])
+    modification       TableReservationModificationRequest @relation(fields: [modificationId], references: [id])
+
+    @@map("table_reservation_modification_history")
+}
+
+// Reservation Policies System
+model ReservationBusinessPolicy {
+  id                      Int                      @id @default(autoincrement()) @map("policy_id")
+  restaurantId           Int                      @map("restaurant_id")
+  name                   String                   @map("name") // Internal identifier
+  title                  String                   @map("title") // Display title for customers
+  content                String                   @db.Text @map("content") // Policy content/description
+  isRefundAllowed        Boolean                  @default(true) @map("is_refund_allowed")
+
+  // Payment configuration
+  requiresPayment        Boolean                  @default(false) @map("requires_payment")
+  paymentType            FeeType?                 @map("payment_type")
+  paymentValue           Decimal?                 @map("payment_value") @db.Decimal(10, 2)
+  paymentHandledByOptions Boolean                 @default(false) @map("payment_handled_by_options") // When true, options handle payment instead of policy
+
+  // Visibility and status
+  isActive               Boolean                  @default(true) @map("is_active")
+  isVisibleCustomerPortal Boolean                 @default(true) @map("is_visible_customer_portal")
+  isIncludedConfirmationEmail Boolean             @default(false) @map("is_included_confirmation_email")
+  isOptional             Boolean                  @default(false) @map("is_optional") // Can user skip this policy?
+
+  // Conditions - all optional, policy applies if ANY condition matches
+  partySizeMin           Int?                     @map("party_size_min")
+  partySizeMax           Int?                     @map("party_size_max")
+  applicableDays         DayOfWeek[]              @default([MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]) @map("applicable_days")
+  timeIntervalStart      DateTime?                @map("time_interval_start") @db.Time()
+  timeIntervalEnd        DateTime?                @map("time_interval_end") @db.Time()
+  applicableSectionIds   Int[]                    @default([]) @map("applicable_section_ids")
+  applicableMealTypes    MealType[]               @default([]) @map("applicable_meal_types")
+  applicableReservationTypes ReservationType[]    @default([TABLE_ONLY]) @map("applicable_reservation_types")
+
+  // Ordering and skip behavior
+  priority               Int                      @default(0) @map("priority") // Higher priority = processed first
+  skipText               String?                  @map("skip_text") // Text shown for skip button (e.g., "I'll bring my own beverages")
+
+  // Policy options for user selection
+  userSelectionAllowed   Boolean                  @default(false) @map("user_selection_allowed") // Can users choose from options?
+
+  // Metadata
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  createdBy              String                   @map("created_by")
+  updatedBy              String                   @map("updated_by")
+
+  // Relationships
+  restaurant             Restaurant               @relation(fields: [restaurantId], references: [id])
+  policyOptions          ReservationPolicyOption[]
+  appliedPolicies        ReservationAppliedPolicies[]
+
+  @@index([restaurantId, isActive], map: "idx_reservation_business_policies_lookup")
+  @@index([priority])
+  @@map("reservation_business_policies")
+}
+
+// Policy options for user selection
+model ReservationPolicyOption {
+  id                      Int                      @id @default(autoincrement()) @map("option_id")
+  policyId               Int                      @map("policy_id")
+  optionName             String                   @map("option_name") // e.g., "Standard", "BYOB", "Premium"
+  description            String?                  @map("description") // Description of this option
+  additionalPrice        Decimal                  @default(0) @map("additional_price") @db.Decimal(10, 2) // Extra cost for this option
+  additionalPriceType    FeeType                  @default(FIXED) @map("additional_price_type") // FIXED or PERCENTAGE
+  requiresPayment        Boolean                  @default(false) @map("requires_payment") // Does this option require payment?
+  isDefault              Boolean                  @default(false) @map("is_default") // Default selected option
+  displayOrder           Int                      @default(0) @map("display_order") // Order to show options
+  applicableDays         DayOfWeek[]              @default([MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]) @map("applicable_days")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+
+  // Relationships
+  policy                 ReservationBusinessPolicy @relation(fields: [policyId], references: [id])
+  appliedPolicies        ReservationAppliedPolicies[]
+
+  @@index([policyId])
+  @@map("reservation_policy_options")
+}
+
+// Tracks which policies were applied to which reservations
+model ReservationAppliedPolicies {
+  id                Int                    @id @default(autoincrement()) @map("applied_policy_id")
+  reservationId     Int?                   @map("reservation_id") // Nullable - can be linked after payment
+  requestId         Int                    @map("request_id")
+  policyId          Int                    @map("policy_id")
+  selectedOptionId  Int?                   @map("selected_option_id") // Which option was selected (null if no options)
+  wasAccepted       Boolean                @default(false) @map("was_accepted") // Did user accept this policy?
+  wasSkipped        Boolean                @default(false) @map("was_skipped") // Did user skip this policy?
+  appliedAt         DateTime               @default(now()) @map("applied_at")
+
+  // Relationships
+  reservation       Reservation?           @relation(fields: [reservationId], references: [id])
+  request           ReservationRequest     @relation(fields: [requestId], references: [id])
+  policy            ReservationBusinessPolicy @relation(fields: [policyId], references: [id])
+  selectedOption    ReservationPolicyOption? @relation(fields: [selectedOptionId], references: [id])
+
+  @@index([reservationId])
+  @@index([requestId])
+  @@index([policyId])
+  @@index([selectedOptionId])
+  @@map("reservation_applied_policies")
+}
+
+// Table Set model for merged tables (Aggregate: Child Entity of Reservation)
+// Lifecycle: OWNED by Reservation - deleted when reservation is deleted
+model TableSet {
+  id                Int               @id @default(autoincrement()) @map("set_id")
+  reservationId     Int               @map("reservation_id")
+
+  // Slot-specific
+  slotDate          DateTime          @db.Date @map("slot_date")
+  slotStartTime     DateTime          @map("slot_start_time") @db.Time()
+  slotEndTime       DateTime          @map("slot_end_time") @db.Time()
+
+  // Tables in this set (simplified)
+  tableIds          Int[]             @map("table_ids")        // e.g., [5, 7, 9]
+  slotIds           Int[]             @map("slot_ids")         // e.g., [123, 124, 125]
+  primaryTableId    Int               @map("primary_table_id") // The table with original reservation
+
+  // Original slot statuses (for rollback) - JSON only for state preservation
+  // Format: {"123": "RESERVED", "124": "AVAILABLE", "125": "AVAILABLE"}
+  originalStatuses  Json              @map("original_statuses")
+
+  // Set state
+  status            TableSetStatus    @default(PENDING_MERGE)
+  combinedCapacity  Int               @default(0) @map("combined_capacity")
+
+  // Timestamps
+  createdAt         DateTime          @default(now()) @map("created_at")
+  createdBy         String            @map("created_by")
+
+  // Step 2: Merge confirmation
+  confirmedAt       DateTime?         @map("confirmed_at")
+  confirmedBy       String?           @map("confirmed_by")
+
+  // Auto-cleanup (15 min)
+  expiresAt         DateTime?         @map("expires_at")
+
+  // Dissolution
+  dissolvedAt       DateTime?         @map("dissolved_at")
+  dissolvedBy       String?           @map("dissolved_by")
+
+  // Relationships
+  // ✅ Parent-child relationship: TableSet belongs to Reservation
+  // ✅ CASCADE DELETE: When reservation is deleted, all table sets are deleted
+  reservation       Reservation       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  cancellationRequests CancellationRequest[]
+
+  @@unique([reservationId, slotDate, slotStartTime])
+  @@index([reservationId, status])
+  @@index([expiresAt])
+  @@map("table_sets")
+}
+
+model FavoriteRestaurant {
+  id                  Int      @id @default(autoincrement())
+  userId              String   @map("user_id") // Keycloak user ID (sub)
+  restaurantId        Int?     @map("restaurant_id") // Internal restaurant ID (nullable)
+  externalRestaurantId String? @map("external_restaurant_id") // External restaurant ID (e.g., Google Places ID)
+  isInternal          Boolean  @default(true) @map("is_internal")
+  createdAt           DateTime @default(now()) @map("created_at")
+  
+  @@unique([userId, restaurantId, externalRestaurantId])
+  @@index([userId])
+  @@index([restaurantId])
+  @@index([externalRestaurantId])
+  @@map("favorite_restaurants")
+}

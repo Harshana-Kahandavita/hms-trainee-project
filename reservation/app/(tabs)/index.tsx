@@ -1,12 +1,13 @@
 import { LogoutHeader } from "@/components/logout-header";
-import { RESTURANT_DATA } from "@/constants/resturantData";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { restaurantService } from "@/services/restaurant.service";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useState, useEffect } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Platform,
@@ -18,6 +19,14 @@ import {
   View,
 } from "react-native";
 
+interface RestaurantListItem {
+  id: number;
+  restaurantName: string;
+  restaurantLocation: string;
+  mealType?: string[];
+  image?: string;
+}
+
 export default function RestaurantScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -26,11 +35,46 @@ export default function RestaurantScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
+  const [restaurants, setRestaurants] = useState<RestaurantListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => <LogoutHeader />,
     });
   }, [navigation]);
+
+  useEffect(() => {
+    const fetchRestaurants = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await restaurantService.getRestaurants();
+        
+        if (response.success && response.data) {
+          // Map API response to match the expected structure
+          const mappedRestaurants: RestaurantListItem[] = response.data.map((restaurant: any) => ({
+            id: restaurant.id,
+            restaurantName: restaurant.name || 'Restaurant',
+            restaurantLocation: restaurant.address || 'Location not available',
+            mealType: restaurant.mealType || [],
+            image: restaurant.thumbnailImage?.imageUrl || restaurant.heroImage?.imageUrl || restaurant.imageUrl || undefined,
+          }));
+          setRestaurants(mappedRestaurants);
+        } else {
+          setError(response.error || 'Failed to fetch restaurants');
+        }
+      } catch (err) {
+        console.error('Error fetching restaurants:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch restaurants');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRestaurants();
+  }, []);
 
   const handleRestaurantPress = (item: any) => {
     router.push({
@@ -41,14 +85,71 @@ export default function RestaurantScreen() {
     });
   };
 
+  if (loading) {
+    return (
+      <Container style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Reserve your Table</Text>
+          <Text style={styles.headerSubtitle}>Loading restaurants...</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={styles.loadingText}>Loading restaurants...</Text>
+        </View>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Reserve your Table</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="error-outline" size={48} color={colors.icon} />
+          <Text style={styles.emptyText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => {
+              setLoading(true);
+              setError(null);
+              restaurantService.getRestaurants()
+                .then((response) => {
+                  if (response.success && response.data) {
+                    const mappedRestaurants: RestaurantListItem[] = response.data.map((restaurant: any) => ({
+                      id: restaurant.id,
+                      restaurantName: restaurant.name || 'Restaurant',
+                      restaurantLocation: restaurant.address || 'Location not available',
+                      mealType: restaurant.mealType || [],
+                      image: restaurant.thumbnailImage?.imageUrl || restaurant.heroImage?.imageUrl || restaurant.imageUrl || undefined,
+                    }));
+                    setRestaurants(mappedRestaurants);
+                  } else {
+                    setError(response.error || 'Failed to fetch restaurants');
+                  }
+                })
+                .catch((err) => {
+                  setError(err instanceof Error ? err.message : 'Failed to fetch restaurants');
+                })
+                .finally(() => setLoading(false));
+            }}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </Container>
+    );
+  }
+
   return (
     <Container style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Reserve your Table</Text>
-        <Text style={styles.headerSubtitle}>{RESTURANT_DATA.length} restaurants available</Text>
+        <Text style={styles.headerSubtitle}>{restaurants.length} restaurant{restaurants.length !== 1 ? 's' : ''} available</Text>
       </View>
       <FlatList
-        data={RESTURANT_DATA}
+        data={restaurants}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
@@ -64,11 +165,17 @@ export default function RestaurantScreen() {
             activeOpacity={0.8}
             onPress={() => handleRestaurantPress(item)}
           >
-            <Image 
-              source={{ uri: item.image }} 
-              style={styles.restaurantImage}
-              resizeMode="cover"
-            />
+            {item.image ? (
+              <Image 
+                source={{ uri: item.image }} 
+                style={styles.restaurantImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.restaurantImage}>
+                <MaterialIcons name="restaurant" size={48} color={colors.icon} />
+              </View>
+            )}
             <View style={styles.cardContent}>
               <View style={styles.restaurantHeader}>
                 <View style={styles.restaurantInfo}>
@@ -156,6 +263,29 @@ function createStyles(colors: typeof Colors.light) {
       fontSize: 16,
       color: colors.icon,
       marginTop: 12,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: 60,
+    },
+    loadingText: {
+      fontSize: 16,
+      color: colors.icon,
+      marginTop: 12,
+    },
+    retryButton: {
+      marginTop: 16,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      backgroundColor: colors.tint,
+      borderRadius: 8,
+    },
+    retryButtonText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "600",
     },
     card: {
       flexDirection: "row",

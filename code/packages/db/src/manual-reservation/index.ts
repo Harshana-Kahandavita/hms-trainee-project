@@ -1,0 +1,7 @@
+export { ManualReservationQueries } from './ManualReservationQueries'
+export { PromoCodeQueries } from './PromoCodeQueries'
+export { CapacityQuotaQueries } from './CapacityQuotaQueries'
+export { PlatterQueries } from './PlatterQueries'
+export { PendingRequestsQueries } from './pending-requests/PendingRequestsQueries'
+export * from './types'
+export * from './pending-requests/types' 

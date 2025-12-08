@@ -1,12 +1,16 @@
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { customerService } from '@/services/customer';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -26,21 +30,91 @@ interface UserDetailModalProps {
   visible: boolean;
   user: UserItem | null;
   onClose: () => void;
+  onUserUpdate?: (updatedUser: UserItem) => void;
 }
 
 export default function UserDetailModal({
   visible,
   user,
   onClose,
+  onUserUpdate,
 }: UserDetailModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const styles = createStyles(colors);
 
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [emailValue, setEmailValue] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Initialize email value when user changes or editing starts
+  React.useEffect(() => {
+    if (user) {
+      setEmailValue(user.email || '');
+    }
+  }, [user]);
+
   // Don't show anything if no user is selected
   if (!user) {
     return null;
   }
+
+  const handleEditEmail = () => {
+    setEmailValue(user.email || '');
+    setIsEditingEmail(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEmailValue(user.email || '');
+    setIsEditingEmail(false);
+  };
+
+  const handleSaveEmail = async () => {
+    if (!user) return;
+
+    // Validate email format if not empty
+    if (emailValue.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailValue.trim())) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address');
+        return;
+      }
+    }
+
+    setIsUpdating(true);
+    try {
+      const response = await customerService.updateCustomerEmailAddress(
+        user.id,
+        emailValue.trim() || null
+      );
+
+      if (response.success && response.data) {
+        // Update the user object with new email
+        const updatedUser: UserItem = {
+          ...user,
+          email: response.data.email || '',
+        };
+
+        // Notify parent component of the update
+        if (onUserUpdate) {
+          onUserUpdate(updatedUser);
+        }
+
+        setIsEditingEmail(false);
+        Alert.alert('Success', 'Email address updated successfully');
+      } else {
+        Alert.alert('Error', response.error || 'Failed to update email address');
+      }
+    } catch (error) {
+      console.error('Error updating email:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to update email address'
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <Modal
@@ -80,8 +154,55 @@ export default function UserDetailModal({
                   <MaterialIcons name="email" size={20} color={colors.tint} />
                 </View>
                 <View style={styles.detailContent}>
-                  <Text style={styles.label}>Email</Text>
-                  <Text style={styles.value}>{user.email}</Text>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Email</Text>
+                    {!isEditingEmail && (
+                      <TouchableOpacity
+                        onPress={handleEditEmail}
+                        style={styles.editButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <MaterialIcons name="edit" size={18} color={colors.tint} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {isEditingEmail ? (
+                    <View style={styles.editContainer}>
+                      <TextInput
+                        style={styles.emailInput}
+                        value={emailValue}
+                        onChangeText={setEmailValue}
+                        placeholder="Enter email address"
+                        placeholderTextColor={colors.icon}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        editable={!isUpdating}
+                      />
+                      <View style={styles.editActions}>
+                        <TouchableOpacity
+                          onPress={handleCancelEdit}
+                          style={[styles.actionButton, styles.cancelButton]}
+                          disabled={isUpdating}
+                        >
+                          <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleSaveEmail}
+                          style={[styles.actionButton, styles.saveButton]}
+                          disabled={isUpdating}
+                        >
+                          {isUpdating ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={styles.saveButtonText}>Save</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.value}>{user.email || 'No email'}</Text>
+                  )}
                 </View>
               </View>
 
@@ -204,6 +325,56 @@ function createStyles(colors: typeof Colors.light) {
       fontSize: 16,
       color: colors.text,
       fontWeight: '500',
+    },
+    labelRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    editButton: {
+      padding: 4,
+    },
+    editContainer: {
+      marginTop: 4,
+    },
+    emailInput: {
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '500',
+      borderWidth: 1,
+      borderColor: colors.tint + "40",
+      borderRadius: 8,
+      padding: 10,
+      backgroundColor: colors.background,
+      marginBottom: 8,
+    },
+    editActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    actionButton: {
+      flex: 1,
+      padding: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelButton: {
+      backgroundColor: colors.icon + "20",
+    },
+    saveButton: {
+      backgroundColor: colors.tint,
+    },
+    cancelButtonText: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    saveButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
     },
     closeButtonBottom: {
       backgroundColor: colors.tint,
