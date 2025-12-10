@@ -1,7 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { login } from '@/services/auth';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,13 +19,68 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { setAuthenticated } = useAuth();
 
-  const handleLogin = () => {
-    // TODO: Add actual login validation here
-    // Set authentication state to true
-    setAuthenticated(true);
-    // The root layout will automatically redirect to (tabs) when isAuthenticated becomes true
+  const handleLogin = async () => {
+    // Clear previous errors
+    setError(null);
+
+    // Basic validation
+    if (!email.trim()) {
+      setError('Email is required');
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('Password is required');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await login({
+        email_id: email.trim(),
+        user_password: password,
+      });
+
+      if (response.status && response.access_token) {
+        // Login successful - update authentication state
+        setAuthenticated(true);
+        // The root layout will automatically redirect to (tabs) when isAuthenticated becomes true
+      } else {
+        setError(response.message || 'Login failed. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      
+      // Extract error message from response
+      const errorMessage = 
+        err.response?.data?.message || 
+        err.response?.data?.error || 
+        err.message || 
+        'Login failed. Please check your credentials and try again.';
+      
+      setError(errorMessage);
+      
+      // Show alert for better UX
+      Alert.alert(
+        'Login Failed',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -54,12 +112,16 @@ export default function LoginScreen() {
                 placeholder="Email"
                 placeholderTextColor="#94A3B8"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setError(null); // Clear error when user types
+                }}
                 onFocus={() => setFocused('email')}
                 onBlur={() => setFocused(null)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                editable={!isLoading}
               />
             </View>
 
@@ -72,21 +134,42 @@ export default function LoginScreen() {
                 placeholder="Password"
                 placeholderTextColor="#94A3B8"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setError(null); // Clear error when user types
+                }}
                 onFocus={() => setFocused('password')}
                 onBlur={() => setFocused(null)}
                 secureTextEntry
                 autoComplete="password"
+                editable={!isLoading}
               />
             </View>
+
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
 
             <Pressable
               style={({ pressed }) => [
                 styles.button,
-                pressed && styles.buttonPressed,
+                (isLoading || pressed) && styles.buttonPressed,
+                isLoading && styles.buttonDisabled,
               ]}
-              onPress={handleLogin}>
-              <Text style={styles.buttonText}>Sign In</Text>
+              onPress={handleLogin}
+              disabled={isLoading}>
+              {isLoading ? (
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={[styles.buttonText, styles.buttonTextWithLoader]}>
+                    Signing In...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
             </Pressable>
 
           </View>
@@ -193,6 +276,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6366F1',
     fontWeight: '600',
+  },
+  errorContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonTextWithLoader: {
+    marginLeft: 0,
   },
 });
 

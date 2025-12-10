@@ -53,12 +53,14 @@ apiClient.interceptors.request.use(
     const fullUrl = `${config.baseURL}${config.url}`;
     const method = config.method?.toUpperCase() || 'GET';
     
-    // TODO: Inject auth token if available
-    // This can be extended when authentication is fully implemented
-    // const { isAuthenticated, token } = useAuth();
-    // if (isAuthenticated && token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    // Inject auth token if available (skip for login endpoint)
+    if (config.url !== '/auth') {
+      const { getToken } = await import('./auth');
+      const token = await getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     
     console.log('🚀 [API] Request:', method, fullUrl);
     console.log('   - Endpoint:', config.url);
@@ -133,9 +135,14 @@ apiClient.interceptors.response.use(
       console.log('   - User may need to re-authenticate');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       
-      // TODO: Handle token refresh or logout when auth is fully implemented
-      // const { logout } = useAuth();
-      // await logout();
+      // Clear tokens on 401 (token expired or invalid)
+      // Skip for login endpoint to avoid clearing tokens during login
+      if (error.config?.url !== '/auth') {
+        const { logout } = await import('./auth');
+        await logout().catch(() => {
+          // Ignore errors during logout
+        });
+      }
     }
 
     return Promise.reject(error);

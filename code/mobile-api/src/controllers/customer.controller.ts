@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getCustomerById,  updateCustomerEmailAddress as updateCustomerEmail} from '../../../packages/db/src/project_filter/customer';
 import prisma from '../../../packages/db/src/client';
+import { isAdmin } from '../utils/userContext';
 
 export async function findCustomerById(req: Request, res: Response) {
     try {
@@ -11,6 +12,14 @@ export async function findCustomerById(req: Request, res: Response) {
             return res.status(400).json({
                 success: false,
                 error: 'Invalid customer ID. Must be a number.'
+            });
+        }
+
+        // Check if user is admin before returning response
+        if (!isAdmin(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied. Admin role required to access customer data.'
             });
         }
 
@@ -45,6 +54,14 @@ export async function updateCustomerEmailAddress(req: Request, res: Response) {
             return res.status(400).json({
                 success: false,
                 error: 'Invalid customer ID. Must be a number.'
+            });
+        }
+
+        // Check if user is admin before allowing update
+        if (!isAdmin(req)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied. Admin role required to update customer data.'
             });
         }
 
